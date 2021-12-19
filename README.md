@@ -1,0 +1,2 @@
+# remote_control
+基于HoshinoBot的bot私聊消息/好友申请等信息定向转发
