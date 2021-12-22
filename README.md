@@ -20,8 +20,6 @@
 * 在hoshinobot的`modules`文件夹内：
     > git clone https://github.com/Shiina-Yukari/remote_control.git
 
-* 按说明修改`modules/remote_control/config.json`配置文件内容。
-
 * 在`config`文件夹的`__bot__.py`内加入`remote_control`模组：
     > MODULES_ON = {
     > 
@@ -32,3 +30,5 @@
     > ...
     > 
     > }
+
+* 重启HoshinoBot，之后可以按说明修改`modules/remote_control/config.json`配置文件内容。
