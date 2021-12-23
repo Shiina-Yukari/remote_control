@@ -20,6 +20,7 @@
 * 在hoshinobot的`modules`文件夹内：
   > git clone https://github.com/Shiina-Yukari/remote_control.git
 
+<<<<<<< HEAD
 * 按说明修改`modules/remote_control/config.json`配置文件内容。
   > group_invite（入群邀请相关）
   >> mode：入群审批模式
@@ -68,3 +69,17 @@
   > ...
   > 
   > }
+
+* 在`config`文件夹的`__bot__.py`内加入`remote_control`模组：
+    > MODULES_ON = {
+    > 
+    > ...
+    > 
+    >     'remote_control',
+    > 
+    > ...
+    > 
+    > }
+
+* 重启HoshinoBot，之后可以按说明修改`modules/remote_control/config.json`配置文件内容。
+>>>>>>> e1d1be2daad20c9a75fc1ce9e9462f7c0c8c008e
