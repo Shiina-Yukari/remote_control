@@ -1,0 +1,36 @@
+{
+  "group_invite": {
+    "mode": 0,
+    "monitor": "123",
+    "admin": [
+      "123",
+      "234",
+      "345"
+    ]
+  },
+  "friend_invite": {
+    "mode": 0,
+    "monitor": "123",
+    "keyword": "miracle_word"
+  },
+  "relay": {
+    "mode": 0,
+    "monitor": "123123123"
+  },
+  "blacklist": {
+    "group": [
+      "123",
+      "234",
+      "345"
+    ],
+    "friend": [
+      "123",
+      "234",
+      "345"
+    ]
+  },
+  "reason": {
+    "reject": "请联系bot管理组成员审批。",
+    "blacklist": "DO NOT DISTURB."
+  }
+}
