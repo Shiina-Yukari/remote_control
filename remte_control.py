@@ -1,11 +1,15 @@
 import json
 import os
+import sqlite3
 import time
+import asyncio
 
 from aiocqhttp.default import on_message
-from nonebot import RequestSession, on_request, on_command, CommandSession
+from nonebot import RequestSession, on_request
 
 from hoshino import Service, logger
+from hoshino.service import sucmd
+from hoshino.typing import CommandSession
 
 from uuid import uuid4
 
@@ -45,15 +49,59 @@ if not os.path.exists(pathcfg):
     except Exception:
         logger.error('[ERROR]创建配置文件失败，请检查插件目录的读写权限及是否存在config.json。')
 config = json.load(open(pathcfg, 'r', encoding='utf8'))
-approve_dict = dict()
-
-
 uuidChars = ("a", "b", "c", "d", "e", "f",
              "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s",
              "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5",
              "6", "7", "8", "9", "A", "B", "C", "D", "E", "F", "G", "H", "I",
              "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V",
              "W", "X", "Y", "Z")
+DB_PATH = os.path.expanduser("~/.hoshino/event.db")
+
+
+class query_record:
+    def __init__(self,db_path):
+        self.db_path=db_path
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        self._create_table()
+
+    def connect(self):
+        return sqlite3.connect(self.db_path)
+
+    def _create_table(self):
+        with self.connect() as conn:
+            conn.execute(
+                "create table if not exists invite_approval"
+                "(suid text not null, stat int not null, primary key(suid))"
+            )
+            conn.execute("delete from invite_approval")
+
+    def get_approval(self, suid):
+        with self.connect() as conn:
+            r = conn.execute(
+                "SELECT stat FROM invite_approval WHERE suid=?", (suid,)
+            ).fetchone()
+            return r[0] if r else None
+
+    def set_approval(self, suid):
+        with self.connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO invite_approval (suid, stat) VALUES (?, ?)", (suid, 0),
+            )
+
+    def accept_approval(self, suid):
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE invite_approval SET stat=? WHERE suid=?", (1, suid),
+            )
+
+    def del_approval(self,suid):
+        with self.connect() as conn:
+            conn.execute(
+                "DELETE FROM invite_approval WHERE suid=?", (suid,),
+            )
+
+
+db = query_record(DB_PATH)
 
 
 def short_uuid():
@@ -82,18 +130,18 @@ async def handle_group_invite(session: RequestSession):
             await session.approve()
         elif mode == 2:
             uuid = short_uuid()
-            approve_dict[uuid] = False
+            db.set_approval(uuid)
             monitor_message = f"收到来自QQ：{uid} 的邀请入群通知，群号：{gid}\n若同意，请回复 botctrl {uuid}\n此消息发送时间为{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}，有效时长30分钟。"
             await session.bot.send_private_msg(user_id=int(get_config("group_invite", "monitor")),
                                                message=monitor_message)
             for i in range(0, 6):
                 time.sleep(300)
-                if approve_dict[uuid]:
+                if int(db.get_approval(uuid)):
                     await session.approve()
                     break
-            if not approve_dict[uuid]:
+            if not int(db.get_approval(uuid)):
                 await session.reject(reason=get_config("reason", "reject"))
-            approve_dict.pop(uuid, "nokey")
+            db.del_approval(uuid)
         elif mode == 3:
             if uid in get_config("group_invite", "admin"):
                 await session.approve()
@@ -112,18 +160,19 @@ async def handle_friend_invite(session: RequestSession):
             await session.approve()
         elif mode == 2:
             uuid = short_uuid()
-            approve_dict[uuid] = False
-            monitor_message = f"收到来自QQ：{uid} 的好友申请。\n若同意，请回复 botctrl {uuid}\n此消息发送时间为{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}，有效时长30分钟。"
+            db.set_approval(uuid)
+            comm = session.ctx['comment']
+            monitor_message = f"收到来自QQ：{uid} 的好友申请，申请理由为：{comm}\n若同意，请回复 botctrl {uuid}\n此消息发送时间为{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}，有效时长30分钟。"
             await session.bot.send_private_msg(user_id=int(get_config("group_invite", "monitor")),
                                                message=monitor_message)
-            for i in range(0, 6):
-                time.sleep(300)
-                if approve_dict[uuid]:
+            for i in range(0, 5):
+                await asyncio.sleep(300)
+                if int(db.get_approval(uuid)):
                     await session.approve()
                     break
-            if not approve_dict[uuid]:
+            if not int(db.get_approval(uuid)):
                 await session.reject(reason=get_config("reason", "reject"))
-            approve_dict.pop(uuid, "nokey")
+            db.del_approval(uuid)
         elif mode == 3:
             comm = session.ctx['comment']
             if comm == get_config("friend_invite", "keyword"):
@@ -134,14 +183,16 @@ async def handle_friend_invite(session: RequestSession):
         await session.reject(reason=get_config("reason", "blacklist"))
 
 
-@on_command('botctrl')
+@sucmd('botcontrol', aliases=('botctrl'))
 async def bot_control(session: CommandSession):
-    uuid = session.current_arg_text.strip()
+    uuid = session.current_arg.strip()
     if not uuid:
-        uuid = (await session.aget(prompt='请发送审批UID。')).strip()
-    if uuid in approve_dict:
-        approve_dict[uuid] = True
+        await session.send("请在指令中包含相应的UID。")
+    if int(db.get_approval(uuid)) == 0:
+        db.accept_approval(uuid)
         await session.send("已完成审批。")
+    elif int(db.get_approval(uuid)) == 1:
+        await session.send("该UID已审批。")
     else:
         await session.send("无该审批UID。")
 
