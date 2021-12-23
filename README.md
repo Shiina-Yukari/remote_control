@@ -69,16 +69,5 @@
   > 
   > }
 
-* 在`config`文件夹的`__bot__.py`内加入`remote_control`模组：
-  > MODULES_ON = {
-  > 
-  > ...
-  > 
-  >   'remote_control',
-  > 
-  > ...
-  > 
-  > }
-
 * 重启HoshinoBot，之后可以按说明修改`modules/remote_control/config.json`配置文件内容。
 
